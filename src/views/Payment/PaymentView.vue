@@ -104,7 +104,9 @@
 <script>
 import axios from "axios";
 import { onMounted, ref } from "vue";
+import { sha256 } from "js-sha256";
 export default {
+  name: "PaymentPage",
   setup() {
     let transactions = ref([]);
     let order = ref([]);
@@ -117,6 +119,8 @@ export default {
       axios
         .get("https://private-d9d018-apib2ctwc.apiary-mock.com/api/payment/3", {
           headers: {
+            "Content-Type": "application/json;charset=UTF-8",
+            "Access-Control-Allow-Origin": "*",
             Authorization:
               "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZ2VudF9pZCI6NzgsImF1dGhvcml6ZWQiOnRydWUsImVtYWlsIjoiYmltYUBzYWt0aS50dXIiLCJleHAiOjE2MjQwODg4NzMsInVzZXIiOiJzYWt0aSIsInVzZXJfaWQiOjg2MX0.LBf8MjC8QAlJsi-dD-rvVquIau72COMyN-W02SIhlM8",
           },
@@ -130,16 +134,25 @@ export default {
     }
     function fetchDataListOrder() {
       axios
-        .get("https://private-d9d018-apib2ctwc.apiary-mock.com/api/cart")
+        .get("https://private-d9d018-apib2ctwc.apiary-mock.com/api/cart", {
+          headers: {
+            "Content-Type": "application/json;charset=UTF-8",
+            "Access-Control-Allow-Origin": "*",
+            Authorization:
+              "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZ2VudF9pZCI6NzgsImF1dGhvcml6ZWQiOnRydWUsImVtYWlsIjoiYmltYUBzYWt0aS50dXIiLCJleHAiOjE2MjQwODg4NzMsInVzZXIiOiJzYWt0aSIsInVzZXJfaWQiOjg2MX0.LBf8MjC8QAlJsi-dD-rvVquIau72COMyN-W02SIhlM8",
+          },
+        })
         .then((result) => {
           let total_amount;
           let getAdultMap;
+          let getSites;
           let getChildMap;
           let getCur;
           order.value = result.data.data.visit;
           total_amount = result.data.data.total_amount;
           order.value.map((getOrder) => {
             getOrder.site_data.map((getSite) => {
+              getSites = getSite;
               getSite.adult.map((getAdult) => {
                 getAdultMap = getAdult;
                 getCur = getAdult.trf_currency;
@@ -151,6 +164,7 @@ export default {
           });
           getSiteDataAdult.value = getAdultMap;
           getSiteDataChild.value = getChildMap;
+          getSiteData.value = getSites;
           qurrencyTot.value = getCur;
           total.value = total_amount;
         })
@@ -159,8 +173,8 @@ export default {
         });
     }
 
-    function sendData(getPayment) {
-      console.log(getPayment);
+    async function sendData(getPayment) {
+      localStorage.setItem("getPayment", JSON.stringify(getPayment));
       const detailTransactions = [
         {
           Id: getSiteDataAdult.value.trf_id,
@@ -176,29 +190,36 @@ export default {
           Amount: getSiteDataChild.value.trf_total_amount,
           ParentType: "ITEM",
         },
-        // getSiteData.value.adult,
-        // getSiteData.value.child,
+        getSiteData.value.adult,
+        getSiteData.value.child,
       ];
-      //   console.log(getPayment);
+      let refNumber = Math.floor(
+        new Date("2012.08.10").getTime() / 1000
+      ).toString();
+      let getPaymentId = getPayment.payment_id.toString();
+
+      const getSignature = sha256(
+        "ID00919" || refNumber || total.value.toString() || "IDR"
+      );
       let sendBody = {
         APIVersion: "2.0",
-        MerchantCode: "",
-        PaymentId: getPayment.payment_id,
+        MerchantCode: "ID00919",
+        PaymentId: getPaymentId,
         Currency: "IDR",
-        RefNo: "UNIX_TIME",
+        RefNo: Math.floor(new Date("2012.08.10").getTime() / 1000),
         Amount: total.value,
-        ProdDesc: "Pembayaran tiket TWC + RefNo",
+        ProdDesc: "Pembayaran tiket TWC TWC.1659076554",
         RequestType: "Seamless",
         UserName: "Pretest AINO",
         UserEmail: "pretest@hotmail.red",
         UserContact: "081234567890",
-        Remark: "",
+        Remark: "Pembayaran tiket TWC TWC.1659076554",
         Lang: "iso-8859-1",
         ResponseURL:
           "https://sandbox.ipay88.co.id/epayment/fujipaystatusv2.asp",
         BackendURL:
           "http://sandbox.ipay88.co.id/ePayment/testing/RequestForm_savetemp.asp",
-        Signature: "GENERATE SIGNATURE SESUAI DENGAN DOKUMENTASI API",
+        Signature: getSignature,
         ItemTransactions: detailTransactions,
         ShippingAddress: {
           FirstName: "Techsupp",
@@ -265,11 +286,23 @@ export default {
           },
         ],
       };
-      axios.post(
-        "https://sandbox.ipay88.co.id/epayment/entry.asp*",
-        detailTransactions
-      );
-      console.log(sendBody);
+
+      const headers = new Headers();
+      headers.append("Authorization", "api_key");
+      const request = await axios
+        .post(
+          "https://private-d9d018-apib2ctwc.apiary-mock.com/ePayment/WebService/PaymentAPI/Checkout",
+          sendBody
+        )
+        .then((result) => {
+          localStorage.setItem("paymentResponse", JSON.stringify(result));
+          console.log(
+            "result",
+            JSON.parse(localStorage.getItem("paymentResponse"))
+          );
+          location.href = "/status";
+        })
+        .catch((err) => {});
     }
 
     onMounted(() => {

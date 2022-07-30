@@ -8,9 +8,9 @@ import { RouterLink, RouterView } from "vue-router";
       <div class="container">
         <RouterLink to="/" class="navbar-brand">AINO</RouterLink>
         <div class="navbar-nav mr-auto">
-          <!-- <li class="nav-item">
-            <RouterLink to="/About" class="nav-link">Tutorials</RouterLink>
-          </li> -->
+          <li class="nav-item">
+            <RouterLink to="/Status" class="nav-link">Status</RouterLink>
+          </li>
         </div>
       </div>
     </nav>
